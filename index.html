@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>jo's library</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;background:#0d0d0d;overflow:hidden;font-family:'Courier New',Courier,monospace;}
+
+/* CANVAS */
+#graphCanvas{position:fixed;inset:0;width:100%;height:100%;cursor:grab;}
+#graphCanvas.dragging{cursor:grabbing;}
+#graphCanvas.hovering{cursor:pointer;}
+
+/* COUNTER */
+#counter{position:fixed;top:16px;left:16px;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.08em;font-family:'Courier New',monospace;z-index:10;pointer-events:none;}
+
+/* ZOOM */
+#zoomBtns{position:fixed;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;z-index:10;margin-top:32px;}
+.zoom-btn{width:36px;height:36px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);font-size:18px;font-family:'Courier New',monospace;cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background 0.2s;}
+.zoom-btn:hover{background:rgba(255,255,255,0.14);}
+
+/* DETAIL CARD */
+#detailCard{
+  position:fixed;right:0;top:0;bottom:0;
+  width:min(340px,90vw);
+  background:#111;
+  border-left:1px solid rgba(255,255,255,0.07);
+  padding:28px 24px;
+  z-index:50;
+  overflow-y:auto;
+  transform:translateX(100%);
+  transition:transform 0.38s cubic-bezier(0.4,0,0.2,1);
+  display:flex;flex-direction:column;
+}
+#detailCard.open{transform:translateX(0);}
+.dc-close{position:absolute;top:18px;right:20px;background:none;border:none;color:rgba(255,255,255,0.3);font-size:18px;cursor:pointer;font-family:'Courier New',monospace;transition:color 0.2s;}
+.dc-close:hover{color:rgba(255,255,255,0.7);}
+.dc-counter{font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:0.12em;margin-bottom:20px;}
+.dc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle;}
+.dc-title{font-size:20px;color:rgba(255,255,255,0.92);font-weight:normal;line-height:1.3;margin-bottom:6px;}
+.dc-cat{font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.28);margin-bottom:16px;}
+.dc-author{font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:14px;}
+.dc-tags{font-size:10px;color:rgba(255,255,255,0.38);line-height:1.8;margin-bottom:24px;}
+.dc-cover{width:100%;aspect-ratio:2/3;background:#1a1a1a;border-radius:2px;margin-bottom:20px;display:none;object-fit:cover;}
+.dc-cover.show{display:block;}
+.dc-related{margin-bottom:20px;}
+.dc-related-label{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:8px;}
+.dc-related-tag{display:inline-block;font-size:9px;color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);padding:3px 9px;border-radius:1px;margin:2px 2px 0 0;cursor:pointer;transition:all 0.15s;font-family:'Courier New',monospace;}
+.dc-related-tag:hover{border-color:rgba(255,255,255,0.35);color:rgba(255,255,255,0.85);}
+.loan-btn{
+  margin-top:auto;display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.6);font-family:'Courier New',monospace;font-size:11px;
+  padding:10px 20px;border-radius:1px;cursor:pointer;letter-spacing:0.1em;
+  transition:background 0.2s,border-color 0.2s,color 0.2s;
+}
+.loan-btn:hover{background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.38);color:rgba(255,255,255,0.88);}
+.loan-btn.on-loan{border-color:rgba(160,60,60,0.4);color:rgba(200,80,80,0.7);animation:shake 0.4s ease;}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-4px);}40%{transform:translateX(4px);}60%{transform:translateX(-3px);}80%{transform:translateX(3px)};}
+
+/* LOAN MODAL */
+#loanModal{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;}
+#loanModal.active{display:flex;}
+.loan-box{background:#0d0d0d;border:1px solid rgba(255,255,255,0.08);border-radius:2px;padding:28px 30px;width:min(300px,90vw);}
+.loan-box h3{font-size:11px;font-family:'Courier New',monospace;font-weight:normal;color:rgba(255,255,255,0.75);margin-bottom:4px;}
+.loan-box p{font-size:9px;color:rgba(255,255,255,0.25);font-family:'Courier New',monospace;margin-bottom:14px;}
+.loan-box input{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);font-family:'Courier New',monospace;font-size:13px;padding:9px 12px;border-radius:1px;margin-bottom:7px;outline:none;}
+.loan-box input:focus{border-color:rgba(255,255,255,0.28);}
+.loan-box input::placeholder{color:rgba(255,255,255,0.18);}
+.loan-row-btns{display:flex;gap:7px;margin-top:8px;}
+.loan-confirm{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.72);font-family:'Courier New',monospace;font-size:10px;padding:9px;border-radius:1px;cursor:pointer;transition:background 0.2s;}
+.loan-confirm:hover{background:rgba(255,255,255,0.13);}
+.loan-cancel{background:transparent;border:1px solid rgba(255,255,255,0.07);color:rgba(255,255,255,0.25);font-family:'Courier New',monospace;font-size:10px;padding:9px 12px;border-radius:1px;cursor:pointer;}
+.loan-error{font-size:10px;color:#a06060;font-family:'Courier New',monospace;margin-top:4px;min-height:14px;}
+
+/* LEGEND */
+#legend{position:fixed;bottom:20px;left:16px;z-index:10;pointer-events:none;}
+.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.leg-dot{width:8px;height:8px;border-radius:50%;}
+.leg-label{font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:0.08em;font-family:'Courier New',monospace;}
+
+/* TITLE */
+#siteTitle{position:fixed;bottom:20px;right:20px;font-size:9px;letter-spacing:0.2em;color:rgba(255,255,255,0.15);font-family:'Courier New',monospace;cursor:pointer;z-index:10;transition:color 0.2s;}
+#siteTitle:hover{color:rgba(255,255,255,0.4);}
+
+/* ADMIN PORTAL */
+#adminPortal{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.96);align-items:center;justify-content:center;}
+#adminPortal.open{display:flex;}
+.admin-code-wrap{text-align:center;}
+.admin-code-label{font-size:9px;letter-spacing:0.2em;color:#333;font-family:'Courier New',monospace;margin-bottom:14px;}
+#adminCodeInput{background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.7);font-family:'Courier New',monospace;font-size:20px;letter-spacing:0.3em;text-align:center;outline:none;width:140px;padding:6px 0;}
+#adminCodeError{font-size:9px;color:#a06060;font-family:'Courier New',monospace;margin-top:8px;min-height:12px;}
+
+/* MOBILE: stack card below */
+@media(max-width:600px){
+  #detailCard{right:auto;left:0;top:auto;bottom:0;width:100vw;height:65vh;border-left:none;border-top:1px solid rgba(255,255,255,0.07);transform:translateY(100%);}
+  #detailCard.open{transform:translateY(0);}
+}
+</style>
+</head>
+<body>
+
+<canvas id="graphCanvas"></canvas>
+
+<div id="counter"></div>
+
+<div id="zoomBtns">
+  <button class="zoom-btn" id="zoomIn">+</button>
+  <button class="zoom-btn" id="zoomOut">−</button>
+</div>
+
+<div id="legend"></div>
+<div id="siteTitle">jo's library</div>
+
+<div id="detailCard">
+  <button class="dc-close" id="dcClose">&#x2715;</button>
+  <div class="dc-counter" id="dcCounter"></div>
+  <div class="dc-title" id="dcTitle"></div>
+  <div class="dc-cat" id="dcCat"></div>
+  <div class="dc-author" id="dcAuthor"></div>
+  <div class="dc-tags" id="dcTags"></div>
+  <div class="dc-related" id="dcRelated"></div>
+  <button class="loan-btn" id="loanBtn">loan</button>
+</div>
+
+<div id="loanModal">
+  <div class="loan-box">
+    <h3 id="loanModalTitle"></h3>
+    <p>code</p>
+    <input type="text" id="codeInput" placeholder="code" style="text-transform:lowercase;letter-spacing:0.12em;"/>
+    <div class="loan-error" id="loanError"></div>
+    <div class="loan-row-btns">
+      <button class="loan-confirm" id="loanConfirm">loan</button>
+      <button class="loan-cancel" id="loanCancel">cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminPortal">
+  <div class="admin-code-wrap">
+    <div class="admin-code-label">access code</div>
+    <input type="password" id="adminCodeInput" placeholder="——" autocomplete="off"/>
+    <div id="adminCodeError"></div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──
+const CODE_NAMES={"z26":"ZACHARY Teh","jx26":"Jenn Xie","yf26":"YueFoong","ysf26":"Youssef El Hakim","sj26":"SJ","jo26":"Josiah","iz26":"Isaac Lim"};
+const VALID_CODES=Object.keys(CODE_NAMES);
+const EMAILJS_PUBLIC="6cQGiB6sXH0jf6gvc";
+const EMAILJS_TEMPLATE="template_vs8ka9l";
+const EMAILJS_SERVICE="service_hjjj54d";
+const MAX_LOANS=2;
+const LOANS_KEY='jo_archive_loans';
+const _a=[51,48,54,48];const _b=_a.map(c=>String.fromCharCode(c)).join('');
+
+const CAT_COLORS={
+  "History":"#4a8c4a","Theory":"#5555cc","Monographs":"#cc4444",
+  "Typologies":"#bb8800","Technical":"#22aaaa","Serials":"#aa44aa"
+};
+// Dimmer versions for nodes
+const CAT_NODE={
+  "History":"#1e3a1e","Theory":"#1a1a4a","Monographs":"#3a1414",
+  "Typologies":"#3a2800","Technical":"#0e3030","Serials":"#2a0e2a"
+};
+
+const RAW=[
+  {cat:"History",sub:"Crit. history",title:"Topography of Terror",author:"N/A",tags:"Berlin, WWII, Documentation"},
+  {cat:"History",sub:"Urban history",title:"The Seduction of Place",author:"Joseph Rykwert",tags:"Urban history, Civic identity"},
+  {cat:"History",sub:"Crit. history",title:"Modern Architecture: A Critical History",author:"Kenneth Frampton",tags:"Modernism, Regionalism"},
+  {cat:"History",sub:"Crit. history",title:"The Illustrated History of Architecture",author:"N/A",tags:"General survey"},
+  {cat:"History",sub:"Urban history",title:"Design of Cities",author:"Edmund N. Bacon",tags:"Urban design, City planning"},
+  {cat:"History",sub:"Crit. history",title:"The Architecture of the Well-tempered Environment",author:"Reyner Banham",tags:"Environmental engineering, Climate control"},
+  {cat:"History",sub:"Urban history",title:"Paris: The Architecture Guide",author:"Braun Publishing",tags:"Paris, City guide, Topography"},
+  {cat:"History",sub:"Crit. history",title:"100 Years of Architecture",author:"Alan Powers",tags:"20th century, Modernism"},
+  {cat:"Theory",sub:"Urbanism",title:"Cities for a Small Planet",author:"Richard Rogers",tags:"Sustainability, Urban planning"},
+  {cat:"Theory",sub:"Urbanism",title:"Cities for a Small Country",author:"Rogers and Power",tags:"Urban policy, Masterplanning"},
+  {cat:"Theory",sub:"Visual culture",title:"Techniques of the Observer",author:"Jonathan Crary",tags:"Perception, Modernity, Vision"},
+  {cat:"Theory",sub:"Cultural theory",title:"Warped Space",author:"Anthony Vidler",tags:"Psychology, Spatial theory"},
+  {cat:"Theory",sub:"Formal theory",title:"The Mathematics of the Ideal Villa",author:"Colin Rowe",tags:"Proportion, Formalism"},
+  {cat:"Theory",sub:"Phenomenology",title:"Experiencing Architecture",author:"Steen Eiler Rasmussen",tags:"Spatial perception, Light"},
+  {cat:"Theory",sub:"Anthropology",title:"Non-Places",author:"Marc Augé",tags:"Supermodernity, Transit spaces"},
+  {cat:"Theory",sub:"Urbanism",title:"Metis: Urban Cartographies",author:"M. Dorrian, A. Hawker",tags:"Mapping, Urban representation"},
+  {cat:"Theory",sub:"Ornament",title:"Ornament and Crime",author:"Adolf Loos",tags:"Early modernism, Manifestos"},
+  {cat:"Theory",sub:"Visual culture",title:"Privacy and Publicity",author:"Beatriz Colomina",tags:"Media, Domesticity, Gender"},
+  {cat:"Theory",sub:"Visual culture",title:"Aperture 136: Metamorphoses",author:"N/A",tags:"Photography, Digital representation"},
+  {cat:"Theory",sub:"Visual culture",title:"Graphic Design for the 21st Century",author:"C. & P. Fiell",tags:"Typography, Communication"},
+  {cat:"Theory",sub:"Cultural theory",title:"Architecture Theory since 1968",author:"K. Michael Hays (ed)",tags:"Postmodernism, Critical theory"},
+  {cat:"Theory",sub:"Formal theory",title:"The Architecture of Error",author:"Francesca Hughes",tags:"Error, Precision, Technology"},
+  {cat:"Theory",sub:"Urbanism",title:"The Language of Cities",author:"Deyan Sudjic",tags:"Urban planning, Sociology"},
+  {cat:"Theory",sub:"Urbanism",title:"Imagining Cities",author:"Westwood & Williams (eds)",tags:"Sociology, Urban culture, Globalization"},
+  {cat:"Theory",sub:"Formal theory",title:"Understanding Architecture",author:"Conway and Roenisch",tags:"Architectural education, Design principles"},
+  {cat:"Theory",sub:"Cultural theory",title:"Staging History",author:"Kathy Rowland",tags:"Malaysia, Theatre, Performance arts"},
+  {cat:"Theory",sub:"Urbanism",title:"Waterfront Case Studies",author:"Josiah Prince Gomez et al.",tags:"Taizhou, Elmina, Waterfront"},
+  {cat:"Monographs",sub:"Le Corbusier",title:"Towards a New Architecture",author:"Le Corbusier",tags:"Manifestos, Purism"},
+  {cat:"Monographs",sub:"Le Corbusier",title:"Le Corbusier (World of Art)",author:"Kenneth Frampton",tags:"Biography, Career survey"},
+  {cat:"Monographs",sub:"Le Corbusier",title:"Le Corbusier: An Analysis of Form",author:"Geoffrey Baker",tags:"Formal analysis, Diagrams"},
+  {cat:"Monographs",sub:"Le Corbusier",title:"Chandigarh: Forty Years After",author:"N/A",tags:"Civic design, Masterplanning"},
+  {cat:"Monographs",sub:"Mies van der Rohe",title:"Mies van der Rohe",author:"Jean-Louis Cohen",tags:"Modernism, Biography"},
+  {cat:"Monographs",sub:"Mies van der Rohe",title:"Mies van der Rohe at Work",author:"Peter Carter",tags:"Practice, Detailing, Process"},
+  {cat:"Monographs",sub:"Foster / Herzog",title:"Foster and Partners",author:"teNeues",tags:"High-tech, Corporate"},
+  {cat:"Monographs",sub:"Foster / Herzog",title:"Building Tate Modern",author:"R. Moore, R. Ryan",tags:"Adaptive reuse, Museums"},
+  {cat:"Monographs",sub:"Eisenman / FOA",title:"Peter Eisenman: Diagram Diaries",author:"Peter Eisenman",tags:"Deconstructivism"},
+  {cat:"Monographs",sub:"Eisenman / FOA",title:"House VI: The Client's Response",author:"Suzanne Frank",tags:"Residential, Post-occupancy"},
+  {cat:"Monographs",sub:"Eisenman / FOA",title:"The Yokohama Project",author:"Foreign Office Architects",tags:"Parametricism, Infrastructure"},
+  {cat:"Monographs",sub:"Jiricna / Prouvé",title:"Le Pavillon du Centenaire de l'Aluminium",author:"Jean Prouvé",tags:"Prefabrication, Materiality"},
+  {cat:"Monographs",sub:"Jiricna / Prouvé",title:"Eva Jiricna: Design in Exile",author:"Martin Pawley",tags:"Interiors, Staircase design"},
+  {cat:"Monographs",sub:"Other",title:"Architecture Principe",author:"P. Virilio, C. Parent",tags:"Oblique function, Brutalism"},
+  {cat:"Monographs",sub:"Other",title:"Frederick Kiesler 1890–1965",author:"N/A",tags:"Endless house, Avant-garde"},
+  {cat:"Monographs",sub:"Other",title:"Toshiko Mori Architect",author:"Toshiko Mori",tags:"Contemporary practice"},
+  {cat:"Monographs",sub:"UCSI",title:"Exsanguination Engine 00",author:"Josiah Prince Gomez",tags:"Design Studio III, Student portfolio"},
+  {cat:"Monographs",sub:"UCSI",title:"a.design.anthology.",author:"Josiah Prince Gomez",tags:"Design Studio II, Student portfolio"},
+  {cat:"Typologies",sub:"Housing",title:"Accommodating Change (Vol 1)",author:"Hilary French",tags:"Residential innovation"},
+  {cat:"Typologies",sub:"Vernacular",title:"The Traditional Malay House",author:"A.H. Nasir, W.H. Wan Teh",tags:"Timber framing, Climate"},
+  {cat:"Typologies",sub:"Vernacular",title:"Contemporary Asian Architects",author:"N/A",tags:"Modernism in Asia"},
+  {cat:"Typologies",sub:"Vernacular",title:"New London Architecture",author:"Kenneth Powell",tags:"Millennial boom, Regeneration"},
+  {cat:"Typologies",sub:"Museums",title:"The Architecture of Museums",author:"N/A",tags:"Curation, Civic monuments"},
+  {cat:"Typologies",sub:"Museums",title:"Contemporary Museums",author:"N/A",tags:"Curation, Civic monuments"},
+  {cat:"Typologies",sub:"Museums",title:"Soane and After: Dulwich Picture Gallery",author:"N/A",tags:"Historicism, Lighting"},
+  {cat:"Typologies",sub:"Transport",title:"Modern Trains and Splendid Stations",author:"Martha Thorne",tags:"Infrastructure, Transit hubs"},
+  {cat:"Typologies",sub:"Transport",title:"Moving People: From Street to Platform",author:"N/A",tags:"Circulation, Crowd flows"},
+  {cat:"Typologies",sub:"Transport",title:"Architecture of Transportation",author:"N/A",tags:"Infrastructure"},
+  {cat:"Typologies",sub:"Minimalism",title:"The Architecture of Minimalism",author:"N/A",tags:"Reduction, Material purity"},
+  {cat:"Typologies",sub:"Housing",title:"The Whole House Book",author:"C. Harris, P. Borer",tags:"Eco-building, Residential"},
+  {cat:"Typologies",sub:"Tall buildings",title:"The Tall Building Artistically Reconsidered",author:"Ada Louise Huxtable",tags:"Skyscrapers, Urban form"},
+  {cat:"Typologies",sub:"Tall buildings",title:"Reaching for the Skies",author:"N/A",tags:"Verticality"},
+  {cat:"Typologies",sub:"Vernacular",title:"Vision: 50 Years of British Creativity",author:"N/A",tags:"Multidisciplinary design"},
+  {cat:"Typologies",sub:"Materials",title:"Light in Architecture",author:"N/A",tags:"Daylighting, Atmosphere"},
+  {cat:"Typologies",sub:"Materials",title:"Elements of Architecture",author:"N/A",tags:"Components, Typologies"},
+  {cat:"Typologies",sub:"Materials",title:"Colour in Architecture",author:"N/A",tags:"Polychromy, Perception"},
+  {cat:"Typologies",sub:"Materials",title:"Architecture in Process",author:"N/A",tags:"Methodology, Sketches"},
+  {cat:"Typologies",sub:"Vernacular",title:"New Architects 2",author:"N/A",tags:"Emerging practices"},
+  {cat:"Typologies",sub:"Tall buildings",title:"Skyscrapers",author:"David Bennett",tags:"High-rise architecture, Structural design"},
+  {cat:"Typologies",sub:"Housing",title:"Small Houses",author:"Claudia Hildner",tags:"Compact living, Residential"},
+  {cat:"Typologies",sub:"Housing",title:"500 Tricks: Houses & Apartments Under 1000sqft",author:"Page One",tags:"Interior design, Small spaces"},
+  {cat:"Typologies",sub:"Vernacular",title:"The Tropical Malaysian House 1",author:"Robert Powell",tags:"Tropical architecture, Climate responsive"},
+  {cat:"Typologies",sub:"Crit. history",title:"Atlas of World Architecture",author:"Braun Publishing",tags:"Global survey, Contemporary architecture"},
+  {cat:"Typologies",sub:"UCSI",title:"Invisible Dwellings",author:"Sidhu, Mahazir, Ramli",tags:"Design Studio 01, Invisible Cities"},
+  {cat:"Technical",sub:"Building skins",title:"in DETAIL: Building Skins",author:"N/A",tags:"Facades, Cladding, Envelopes"},
+  {cat:"Technical",sub:"Materials",title:"DETAIL 2003: Bauen mit Beton",author:"N/A",tags:"Concrete, Tectonics"},
+  {cat:"Technical",sub:"Contracts",title:"Understanding JCT Contracts",author:"David Chappell",tags:"Legal, Administration"},
+  {cat:"Technical",sub:"Solar",title:"Solar Energy and Housing Design Vol 1",author:"N/A",tags:"Sustainability, Case studies"},
+  {cat:"Technical",sub:"Solar",title:"Solar Energy and Housing Design Vol 2",author:"N/A",tags:"Sustainability, Case studies"},
+  {cat:"Technical",sub:"Structures",title:"Underpinning",author:"Bullivant, Bradbury",tags:"Foundations, Engineering"},
+  {cat:"Technical",sub:"Structures",title:"Raumplan versus Plan Libre",author:"N/A",tags:"Spatial organisation, Tectonics"},
+  {cat:"Technical",sub:"Structures",title:"Foundation Design and Construction",author:"M.J. Tomlinson",tags:"Geotechnical engineering, Foundations"},
+  {cat:"Technical",sub:"Reference",title:"Neufert Architects' Data",author:"Ernst Neufert",tags:"Design standards, Spatial requirements"},
+  {cat:"Technical",sub:"Practice",title:"The Architect in Practice",author:"Chappell & Willis",tags:"Professional practice, Construction law"},
+  {cat:"Technical",sub:"Visual",title:"Drawing Made Easy: Landscapes in Colored Pencil",author:"Eileen Sorg",tags:"Drawing, Technique"},
+  {cat:"Serials",sub:"Europan",title:"Europan Vol 5",author:"N/A",tags:"Competitions, Housing"},
+  {cat:"Serials",sub:"Europan",title:"Europan Vol 6",author:"N/A",tags:"Competitions, Housing"},
+  {cat:"Serials",sub:"AA",title:"AA Projects Review 99/00",author:"N/A",tags:"Student work, Pedagogy"},
+  {cat:"Serials",sub:"AA",title:"AA Projects Review 00/01",author:"N/A",tags:"Student work, Pedagogy"},
+  {cat:"Serials",sub:"AA",title:"AA Prospectus 01/02",author:"N/A",tags:"Curriculum, Pedagogy"},
+  {cat:"Serials",sub:"AA",title:"AA Prospectus 03/04",author:"N/A",tags:"Curriculum, Pedagogy"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 35",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 38",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 39",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 40",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 40 (copy 2)",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 41",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 42",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 43",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 44",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 45/46",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 47",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 48",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 49",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA Files",title:"AA Files 50",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"El Croquis",title:"El Croquis 72[II]",author:"N/A",tags:"Contemporary practice"},
+  {cat:"Serials",sub:"El Croquis",title:"El Croquis 99",author:"N/A",tags:"SANAA, Japanese minimalism"},
+  {cat:"Serials",sub:"El Croquis",title:"El Croquis 102",author:"N/A",tags:"Contemporary practice"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (17 Feb 2005)",author:"N/A",tags:"Cargo Fleet Houses"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (27 Jan 2005)",author:"N/A",tags:"Small Projects 2"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (9 Jan 2003)",author:"N/A",tags:"Small Projects Part 1"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (17 Jun 1999)",author:"N/A",tags:"Industry news"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (28 Oct 2004)",author:"N/A",tags:"Paul Rudolph Townhouse"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (17 May 2001)",author:"N/A",tags:"Industry news"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (21 Dec 2000)",author:"N/A",tags:"Industry news"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (8 Jan 2004)",author:"N/A",tags:"Icons Versus Context"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (16 Jan 2003)",author:"N/A",tags:"Small Projects Part 2"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (25 Nov 1999)",author:"N/A",tags:"Industry news"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (20 Jan 2005)",author:"N/A",tags:"Small Projects 1"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (15 Jul 2004)",author:"N/A",tags:"Kindersley Centre"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architects' Journal (2 Nov 2000)",author:"N/A",tags:"Industry news"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architectural Review 1210",author:"N/A",tags:"Criticism, Global projects"},
+  {cat:"Serials",sub:"AJ/AR",title:"Architectural Review 1274",author:"N/A",tags:"Criticism, Global projects"},
+  {cat:"Serials",sub:"Blueprint",title:"Blueprint N. 215",author:"N/A",tags:"Design culture"},
+  {cat:"Serials",sub:"Blueprint",title:"Blueprint N. 233",author:"N/A",tags:"Design culture"},
+  {cat:"Serials",sub:"AA",title:"AAQuarterly vol 12 no 4 (1980)",author:"N/A",tags:"Academia, Discourse"},
+  {cat:"Serials",sub:"AA",title:"Untitled AA Zine / Booklet",author:"N/A",tags:"Ephemera"},
+  {cat:"Serials",sub:"Other",title:"GA Houses 66",author:"N/A",tags:"Residential typologies"},
+  {cat:"Serials",sub:"Other",title:"Daidalos 75",author:"N/A",tags:"Theory, Art, Culture"},
+  {cat:"Serials",sub:"Other",title:"XII Prophecies for XXI Century",author:"N/A",tags:"Futures, Speculation"},
+  {cat:"Serials",sub:"Other",title:"Architektura & Biznes 12|2005",author:"N/A",tags:"Polish architecture"},
+  {cat:"Serials",sub:"Other",title:"Architektura Stowacji",author:"N/A",tags:"Slovakian architecture"},
+  {cat:"Serials",sub:"Other",title:"PAM Awards 2020",author:"PAM",tags:"Malaysian architecture, Awards"},
+  {cat:"Serials",sub:"Other",title:"CA 24: A Community Architecture Magazine",author:"UCSI / SABE",tags:"Community architecture, Student publication"},
+];
+
+const BOOKS=RAW.map((b,i)=>({id:i+1,...b}));
+const N=BOOKS.length;
+
+// ── LOANS ──
+function loadLoans(){try{return JSON.parse(localStorage.getItem(LOANS_KEY)||'[]');}catch{return[];}}
+function isOnLoan(bookTitle){
+  return loadLoans().some(l=>{
+    const days=(()=>{const due=new Date(l.date);due.setDate(due.getDate()+14);const now=new Date();now.setHours(0,0,0,0);due.setHours(0,0,0,0);return Math.round((due-now)/86400000);})();
+    return l.title===bookTitle&&days>0;
+  });
+}
+const sessionLoans={};
+
+// ── FORCE GRAPH ──
+const canvas=document.getElementById('graphCanvas');
+const ctx=canvas.getContext('2d');
+let W,H;
+
+// Nodes
+const nodes=BOOKS.map((b,i)=>({
+  id:b.id,book:b,
+  x:Math.random()*1600-800,
+  y:Math.random()*1000-500,
+  vx:0,vy:0,
+  r:5,
+}));
+
+// Edges: same category AND same sub
+const edges=[];
+for(let i=0;i<N;i++){
+  for(let j=i+1;j<N;j++){
+    if(BOOKS[i].cat===BOOKS[j].cat){
+      // stronger edge if same sub
+      const w=BOOKS[i].sub===BOOKS[j].sub?1.0:0.3;
+      edges.push({a:i,b:j,w});
+    }
+  }
+}
+
+// Camera
+let camX=0,camY=0,zoom=1;
+let dragging=false,lastMX=0,lastMY=0;
+let hoveredNode=null,selectedNode=null;
+
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+}
+window.addEventListener('resize',resize);
+resize();
+
+// ── FORCE SIMULATION ──
+let simRunning=true;
+const K_REPEL=3200;
+const K_ATTRACT=0.018;
+const K_SAME_SUB=0.05;
+const DAMPING=0.82;
+const CENTER_PULL=0.004;
+
+function simulate(){
+  if(!simRunning)return;
+  // Repulsion between all pairs (barnes-hut approximation: just do all for <200 nodes, do grid for more)
+  for(let i=0;i<N;i++){
+    const a=nodes[i];
+    for(let j=i+1;j<N;j++){
+      const b=nodes[j];
+      const dx=a.x-b.x,dy=a.y-b.y;
+      const d2=dx*dx+dy*dy+1;
+      const f=K_REPEL/d2;
+      const nx=dx/Math.sqrt(d2),ny=dy/Math.sqrt(d2);
+      a.vx+=nx*f;a.vy+=ny*f;
+      b.vx-=nx*f;b.vy-=ny*f;
+    }
+  }
+  // Attraction along edges
+  for(const e of edges){
+    const a=nodes[e.a],b=nodes[e.b];
+    const dx=b.x-a.x,dy=b.y-a.y;
+    const d=Math.sqrt(dx*dx+dy*dy)+0.01;
+    const idealDist=BOOKS[e.a].sub===BOOKS[e.b].sub?80:220;
+    const f=(d-idealDist)*K_ATTRACT*e.w*(BOOKS[e.a].sub===BOOKS[e.b].sub?K_SAME_SUB/K_ATTRACT:1);
+    const nx=dx/d,ny=dy/d;
+    a.vx+=nx*f;a.vy+=ny*f;
+    b.vx-=nx*f;b.vy-=ny*f;
+  }
+  // Center pull
+  for(const n of nodes){
+    n.vx-=n.x*CENTER_PULL;
+    n.vy-=n.y*CENTER_PULL;
+    n.vx*=DAMPING;n.vy*=DAMPING;
+    n.x+=n.vx;n.y+=n.vy;
+  }
+}
+
+// ── DRAW ──
+function worldToScreen(wx,wy){
+  return{x:(wx+camX)*zoom+W/2,y:(wy+camY)*zoom+H/2};
+}
+function screenToWorld(sx,sy){
+  return{x:(sx-W/2)/zoom-camX,y:(sy-H/2)/zoom-camY};
+}
+
+function drawGraph(){
+  ctx.clearRect(0,0,W,H);
+
+  // Edges
+  for(const e of edges){
+    const a=worldToScreen(nodes[e.a].x,nodes[e.a].y);
+    const b=worldToScreen(nodes[e.b].x,nodes[e.b].y);
+    const alpha=BOOKS[e.a].sub===BOOKS[e.b].sub?0.18:0.06;
+    ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
+    ctx.lineWidth=BOOKS[e.a].sub===BOOKS[e.b].sub?0.8:0.4;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+
+  // Nodes
+  for(let i=0;i<N;i++){
+    const n=nodes[i];
+    const s=worldToScreen(n.x,n.y);
+    const isHov=hoveredNode===i;
+    const isSel=selectedNode===i;
+    const col=CAT_COLORS[n.book.cat]||'#888';
+    const r=(isSel?9:isHov?8:5)*Math.max(0.5,Math.min(zoom,2));
+
+    // glow on hover/select
+    if(isHov||isSel){
+      const g=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,r*3);
+      g.addColorStop(0,col+'55');g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(s.x,s.y,r*3,0,Math.PI*2);ctx.fill();
+    }
+
+    // circle
+    ctx.fillStyle=isSel||isHov?col:col+'99';
+    ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.fill();
+
+    // ring for selected
+    if(isSel){
+      ctx.strokeStyle=col;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(s.x,s.y,r+4,0,Math.PI*2);ctx.stroke();
+    }
+
+    // label — show on hover or if zoomed in enough, or selected
+    if(isHov||isSel||(zoom>1.4&&r>4)){
+      const label=n.book.title;
+      ctx.font=`${isSel?12:10}px 'Courier New',monospace`;
+      ctx.textAlign='left';
+      const metrics=ctx.measureText(label);
+      const lx=s.x+r+5,ly=s.y+4;
+      // bg box
+      ctx.fillStyle='rgba(13,13,13,0.85)';
+      ctx.fillRect(lx-3,ly-11,metrics.width+6,16);
+      ctx.fillStyle=isSel?'rgba(255,255,255,0.9)':isHov?'rgba(255,255,255,0.75)':'rgba(255,255,255,0.45)';
+      ctx.fillText(label,lx,ly);
+    }
+  }
+
+  // Counter
+  document.getElementById('counter').textContent=`${N} entries`;
+}
+
+// ── ANIMATION LOOP ──
+let simSteps=0;
+function loop(){
+  if(simSteps<400)simulate();
+  simSteps++;
+  drawGraph();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ── INTERACTION ──
+function getNodeAt(sx,sy){
+  const w=screenToWorld(sx,sy);
+  let best=null,bestD=Infinity;
+  for(let i=0;i<N;i++){
+    const n=nodes[i];
+    const dx=n.x-w.x,dy=n.y-w.y;
+    const hitR=(12)/zoom;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<hitR&&d<bestD){bestD=d;best=i;}
+  }
+  return best;
+}
+
+canvas.addEventListener('mousemove',e=>{
+  if(dragging){
+    camX+=(e.clientX-lastMX)/zoom;
+    camY+=(e.clientY-lastMY)/zoom;
+    lastMX=e.clientX;lastMY=e.clientY;
+    hoveredNode=null;canvas.className='dragging';
+    return;
+  }
+  const hit=getNodeAt(e.clientX,e.clientY);
+  hoveredNode=hit;
+  canvas.className=hit!==null?'hovering':'';
+});
+
+canvas.addEventListener('mousedown',e=>{
+  dragging=true;lastMX=e.clientX;lastMY=e.clientY;
+});
+window.addEventListener('mouseup',e=>{
+  if(!dragging)return;
+  const moved=Math.abs(e.clientX-lastMX)+Math.abs(e.clientY-lastMY);
+  dragging=false;
+  if(moved<5){
+    const hit=getNodeAt(e.clientX,e.clientY);
+    if(hit!==null)openNode(hit);
+  }
+  canvas.className=hoveredNode!==null?'hovering':'';
+});
+
+// Touch
+let touchStartX=0,touchStartY=0,touchDragged=false;
+canvas.addEventListener('touchstart',e=>{
+  touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY;
+  touchDragged=false;lastMX=touchStartX;lastMY=touchStartY;
+},{passive:true});
+canvas.addEventListener('touchmove',e=>{
+  const dx=e.touches[0].clientX-lastMX,dy=e.touches[0].clientY-lastMY;
+  camX+=dx/zoom;camY+=dy/zoom;
+  lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;
+  touchDragged=true;
+},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  if(!touchDragged){
+    const t=e.changedTouches[0];
+    const hit=getNodeAt(t.clientX,t.clientY);
+    if(hit!==null)openNode(hit);
+  }
+});
+
+// Wheel zoom
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const factor=e.deltaY<0?1.1:0.91;
+  const wx=(e.clientX-W/2)/zoom-camX;
+  const wy=(e.clientY-H/2)/zoom-camY;
+  zoom=Math.max(0.2,Math.min(6,zoom*factor));
+  camX=(e.clientX-W/2)/zoom-wx;
+  camY=(e.clientY-H/2)/zoom-wy;
+},{passive:false});
+
+document.getElementById('zoomIn').addEventListener('click',()=>{zoom=Math.min(6,zoom*1.2);});
+document.getElementById('zoomOut').addEventListener('click',()=>{zoom=Math.max(0.2,zoom/1.2);});
+
+// ── DETAIL CARD ──
+let currentBookId=null;
+function openNode(idx){
+  const book=BOOKS[idx];
+  selectedNode=idx;currentBookId=book.id;
+
+  document.getElementById('dcCounter').innerHTML=`<span class="dc-dot" style="background:${CAT_COLORS[book.cat]};"></span>${book.id} / ${N}`;
+  document.getElementById('dcTitle').textContent=book.title;
+  document.getElementById('dcCat').textContent=`${book.cat} / ${book.sub}`;
+  document.getElementById('dcAuthor').textContent=book.author==='N/A'?'':book.author;
+  document.getElementById('dcTags').textContent=book.tags;
+
+  // Related: same cat
+  const related=BOOKS.filter(b=>b.cat===book.cat&&b.id!==book.id).slice(0,5);
+  const relWrap=document.getElementById('dcRelated');
+  relWrap.innerHTML=`<div class="dc-related-label">related</div>`;
+  related.forEach(r=>{
+    const t=document.createElement('span');t.className='dc-related-tag';t.textContent=r.title;
+    t.addEventListener('click',()=>{const i=nodes.findIndex(n=>n.id===r.id);if(i>=0)openNode(i);});
+    relWrap.appendChild(t);
+  });
+
+  // Loan button state
+  const btn=document.getElementById('loanBtn');
+  const onLoan=isOnLoan(book.title)||(sessionLoans[book.id]&&sessionLoans[book.id]>0);
+  if(onLoan){btn.textContent='on loan';btn.classList.add('on-loan');btn.disabled=true;}
+  else{btn.textContent='loan';btn.classList.remove('on-loan');btn.disabled=false;}
+  document.getElementById('loanModalTitle').textContent=book.title;
+
+  // Pan camera to node
+  const n=nodes[idx];
+  camX=-n.x+(window.innerWidth>600?-100:0)/zoom;
+  camY=-n.y;
+
+  document.getElementById('detailCard').classList.add('open');
+}
+
+document.getElementById('dcClose').addEventListener('click',()=>{
+  document.getElementById('detailCard').classList.remove('open');
+  selectedNode=null;currentBookId=null;
+});
+
+// ── LOAN MODAL ──
+document.getElementById('loanBtn').addEventListener('click',()=>{
+  if(document.getElementById('loanBtn').disabled)return;
+  document.getElementById('loanError').textContent='';
+  document.getElementById('codeInput').value='';
+  document.getElementById('loanModal').classList.add('active');
+});
+document.getElementById('loanCancel').addEventListener('click',()=>document.getElementById('loanModal').classList.remove('active'));
+document.getElementById('loanConfirm').addEventListener('click',async()=>{
+  const book=BOOKS.find(b=>b.id===currentBookId);if(!book)return;
+  const code=document.getElementById('codeInput').value.trim().toLowerCase();
+  const err=document.getElementById('loanError');
+  const btn=document.getElementById('loanConfirm');
+  if(!VALID_CODES.includes(code)){err.textContent='invalid code.';return;}
+  const ex=sessionLoans[book.id]||0;
+  if(ex>=MAX_LOANS){err.textContent='limit reached.';return;}
+  sessionLoans[book.id]=(ex||0)+1;
+  btn.textContent='sending...';btn.disabled=true;err.textContent='';
+  try{
+    if(window.emailjs){
+      await emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{
+        'user-name':CODE_NAMES[code]||code,
+        'book_title':book.title,
+        'book_author':book.author==='N/A'?'':book.author,
+      });
+    }
+  }catch(e){console.error(e);}
+  btn.textContent='loan';btn.disabled=false;
+  document.getElementById('loanModal').classList.remove('active');
+  // Update button in card
+  const lb=document.getElementById('loanBtn');
+  lb.textContent='on loan';lb.classList.add('on-loan');lb.disabled=true;
+});
+
+// ── LEGEND ──
+const leg=document.getElementById('legend');
+Object.entries(CAT_COLORS).forEach(([cat,col])=>{
+  leg.innerHTML+=`<div class="leg-item"><div class="leg-dot" style="background:${col}"></div><div class="leg-label">${cat.toLowerCase()}</div></div>`;
+});
+
+// ── ADMIN ──
+document.getElementById('siteTitle').addEventListener('click',()=>{
+  document.getElementById('adminPortal').classList.add('open');
+  document.getElementById('adminCodeInput').value='';
+  document.getElementById('adminCodeError').textContent='';
+  setTimeout(()=>document.getElementById('adminCodeInput').focus(),50);
+});
+document.getElementById('adminPortal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('adminPortal'))document.getElementById('adminPortal').classList.remove('open');
+});
+document.getElementById('adminCodeInput').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){document.getElementById('adminPortal').classList.remove('open');return;}
+  if(e.key==='Enter'){
+    if(document.getElementById('adminCodeInput').value.trim()===_b){
+      window.location.href='admin.html';
+    }else{
+      document.getElementById('adminCodeError').textContent='incorrect.';
+      document.getElementById('adminCodeInput').value='';
+    }
+  }
+});
+
+// ── INIT ──
+window.addEventListener('load',()=>{
+  if(window.emailjs)emailjs.init({publicKey:EMAILJS_PUBLIC});
+});
+</script>
+</body>
+</html>
